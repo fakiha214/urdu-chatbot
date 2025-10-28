@@ -16,6 +16,22 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+@st.cache_resource
+def ensure_model_downloaded():
+    """Ensure model is downloaded before app runs"""
+    from download_model import ensure_model_exists
+
+    model_path = Path("models/best_model.pt")
+    google_drive_url = "https://drive.google.com/file/d/1xM0ZkliwQ4o1KnFIq4j23BNYpZf8nVU7/view?usp=sharing"
+
+    if not ensure_model_exists(model_path, google_drive_url):
+        st.error("Failed to download model from Google Drive")
+        st.stop()
+
+    return True
+
+ensure_model_downloaded()
+
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
