@@ -1,6 +1,6 @@
 """
 Urdu Conversational Chatbot - Streamlit App
-Deployment-ready application with RTL support
+RTL-supported web interface for the trained Transformer model
 """
 
 import streamlit as st
@@ -9,21 +9,17 @@ import sys
 from pathlib import Path
 import time
 
-# Page configuration
 st.set_page_config(
-    page_title="Urdu Chatbot | اردو چیٹ بوٹ",
-    page_icon="💬",
+    page_title="Urdu Chatbot",
+    page_icon="chat",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for Urdu RTL support and styling
 st.markdown("""
 <style>
-    /* Import Urdu font */
     @import url('https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap');
 
-    /* Urdu text styling */
     .urdu-text {
         direction: rtl;
         text-align: right;
@@ -32,7 +28,6 @@ st.markdown("""
         line-height: 2;
     }
 
-    /* Chat message styling */
     .user-message {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -59,7 +54,6 @@ st.markdown("""
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
 
-    /* Input box styling */
     .stTextInput > div > div > input {
         direction: rtl;
         text-align: right;
@@ -67,7 +61,6 @@ st.markdown("""
         font-size: 16px;
     }
 
-    /* Button styling */
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
@@ -83,12 +76,6 @@ st.markdown("""
         box-shadow: 0 5px 15px rgba(0,0,0,0.2);
     }
 
-    /* Sidebar styling */
-    .css-1d391kg {
-        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
-    }
-
-    /* Title styling */
     .main-title {
         text-align: center;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -109,7 +96,6 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* Info boxes */
     .info-box {
         background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         padding: 15px;
@@ -118,7 +104,6 @@ st.markdown("""
         margin: 10px 0;
     }
 
-    /* Stats display */
     .stat-card {
         background: white;
         padding: 20px;
@@ -144,94 +129,59 @@ st.markdown("""
 
 @st.cache_resource
 def load_model():
-    """
-    Load the trained model and tokenizer
-    Returns None if model not found (for testing without model)
-    """
+    """Load the trained model and tokenizer from saved files"""
+    model_path = Path("models/best_model.pt")
+    vocab_path = Path("models/vocabulary")
+
+    if not model_path.exists():
+        st.error("Model file not found at models/best_model.pt")
+        st.stop()
+
+    if not (vocab_path / "tokenizer.pkl").exists():
+        st.error("Tokenizer not found at models/vocabulary/tokenizer.pkl")
+        st.stop()
+
+    from model_loader import load_transformer_model, load_tokenizer
+
+    tokenizer = load_tokenizer(vocab_path)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = load_transformer_model(model_path, device=device)
+    model.eval()
+
+    return model, tokenizer, device
+
+
+def generate_response(user_input, model, tokenizer, device, strategy='greedy', beam_width=3):
+    """Generate response from the model"""
     try:
-        # Add model loading code here
-        # This is a placeholder that returns None when model isn't available
-        model_path = Path("models/best_model.pt")
-        vocab_path = Path("models/vocabulary")
-
-        if not model_path.exists():
-            return None, None, "Model not found. Please upload the trained model to 'models/' folder."
-
-        # When you have the model, uncomment and modify this:
-        # from model_loader import load_transformer_model, load_tokenizer
-        # model = load_transformer_model(model_path)
-        # tokenizer = load_tokenizer(vocab_path)
-        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        # model = model.to(device)
-        # model.eval()
-        # return model, tokenizer, None
-
-        return None, None, "Model loading not implemented yet."
-
-    except Exception as e:
-        return None, None, f"Error loading model: {str(e)}"
-
-
-def generate_response(user_input, model, tokenizer, strategy='greedy', beam_width=3):
-    """
-    Generate response from the model
-    Placeholder function for when model is not loaded
-    """
-    if model is None:
-        # Demo responses when model is not available
-        demo_responses = {
-            "آپ کیسے ہیں؟": "میں ٹھیک ہوں، شکریہ! آپ کیسے ہیں؟",
-            "السلام علیکم": "وعلیکم السلام! خوش آمدید",
-            "آپ کا نام کیا ہے؟": "میں ایک اردو چیٹ بوٹ ہوں",
-            "شکریہ": "خوش آمدید! کوئی اور سوال؟",
-            "خدا حافظ": "اللہ حافظ! پھر ملیں گے"
-        }
-
-        # Return demo response or default
-        response = demo_responses.get(user_input, "معاف کیجیے، میں سمجھ نہیں پایا۔ براہ کرم دوبارہ کوشش کریں۔")
+        from inference import generate_response as model_generate
+        response = model_generate(
+            model=model,
+            tokenizer=tokenizer,
+            input_text=user_input,
+            max_len=50,
+            decoding_strategy=strategy,
+            beam_width=beam_width,
+            device=device
+        )
         return response
-
-    # When you have the model, implement actual inference here:
-    # try:
-    #     from inference import generate_response as model_generate
-    #     response = model_generate(
-    #         model=model,
-    #         tokenizer=tokenizer,
-    #         input_text=user_input,
-    #         max_len=50,
-    #         decoding_strategy=strategy,
-    #         beam_width=beam_width,
-    #         device=device
-    #     )
-    #     return response
-    # except Exception as e:
-    #     return f"خرابی: {str(e)}"
-
-    return "Model inference not implemented yet."
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 
 def main():
     """Main application"""
 
-    # Load model (or get error message)
-    model, tokenizer, error = load_model()
+    model, tokenizer, device = load_model()
 
-    # Header
-    st.markdown('<div class="main-title">💬 Urdu Conversational Chatbot</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">Urdu Conversational Chatbot</div>', unsafe_allow_html=True)
     st.markdown('<div class="urdu-title">اردو گفتگو چیٹ بوٹ</div>', unsafe_allow_html=True)
 
-    # Show model status
-    if error:
-        st.warning(f"⚠️ {error}")
-        st.info("🔧 The app is running in **DEMO MODE** with sample responses. Upload your trained model to enable full functionality.")
-    else:
-        st.success("✅ Model loaded successfully!")
+    st.success("Model loaded successfully!")
 
-    # Sidebar
     with st.sidebar:
-        st.markdown("### ⚙️ Settings | ترتیبات")
+        st.markdown("### Settings")
 
-        # Decoding strategy
         decoding_strategy = st.radio(
             "Decoding Strategy",
             options=['greedy', 'beam'],
@@ -239,7 +189,6 @@ def main():
             help="Greedy is faster, Beam Search produces better quality"
         )
 
-        # Beam width (only for beam search)
         if decoding_strategy == 'beam':
             beam_width = st.slider(
                 "Beam Width",
@@ -253,22 +202,16 @@ def main():
 
         st.markdown("---")
 
-        # Model information
-        st.markdown("### 📊 Model Info | ماڈل کی معلومات")
+        st.markdown("### Model Information")
 
-        if model is None:
-            st.info("**Status:** Demo Mode")
-            st.write("Upload trained model to enable full features")
-        else:
-            st.metric("Status", "Active ✅")
-            st.metric("Parameters", "~10M")
-            st.metric("Embedding Dim", "512")
-            st.metric("Attention Heads", "2")
+        st.metric("Status", "Active")
+        st.metric("Parameters", "~10M")
+        st.metric("Embedding Dim", "256")
+        st.metric("Attention Heads", "2")
 
         st.markdown("---")
 
-        # Statistics
-        st.markdown("### 📈 Session Stats | اعداد و شمار")
+        st.markdown("### Session Statistics")
 
         if 'message_count' not in st.session_state:
             st.session_state.message_count = 0
@@ -277,119 +220,90 @@ def main():
         with col1:
             st.metric("Messages", st.session_state.message_count)
         with col2:
-            st.metric("Language", "اردو")
+            st.metric("Language", "Urdu")
 
         st.markdown("---")
 
-        # Clear conversation
-        if st.button("🗑️ Clear Chat | صاف کریں", use_container_width=True):
+        if st.button("Clear Chat", use_container_width=True):
             st.session_state.conversation_history = []
             st.session_state.message_count = 0
             st.rerun()
 
         st.markdown("---")
 
-        # About section
-        st.markdown("### ℹ️ About | معلومات")
+        st.markdown("### About")
         st.markdown("""
         <div class="info-box">
-        Built with ❤️ using:
-        <br>• PyTorch Transformers
-        <br>• Multi-Head Attention
-        <br>• Streamlit Framework
+        Built with PyTorch Transformers and Streamlit
         </div>
         """, unsafe_allow_html=True)
 
-        # Links
-        st.markdown("### 🔗 Links | روابط")
-        st.markdown("[![GitHub](https://img.shields.io/badge/GitHub-Code-black?logo=github)](https://github.com/YOUR_USERNAME/urdu-chatbot)")
-        st.markdown("[![Documentation](https://img.shields.io/badge/Docs-Read-blue)](https://github.com/YOUR_USERNAME/urdu-chatbot)")
+    st.markdown("### Chat Interface")
 
-    # Main chat interface
-    st.markdown("### 💬 Chat Interface | گفتگو")
-
-    # Initialize conversation history
     if 'conversation_history' not in st.session_state:
         st.session_state.conversation_history = []
 
-    # Display conversation history
     chat_container = st.container()
 
     with chat_container:
         if len(st.session_state.conversation_history) == 0:
             st.markdown("""
             <div class="info-box">
-            <h4>👋 خوش آمدید! Welcome!</h4>
-            <p>Start the conversation in Urdu. Here are some examples:</p>
+            <h4>Welcome to Urdu Chatbot!</h4>
+            <p>Type your message in Urdu to start the conversation:</p>
             <ul>
-                <li>آپ کیسے ہیں؟ (How are you?)</li>
-                <li>آپ کا نام کیا ہے؟ (What is your name?)</li>
-                <li>السلام علیکم (Greetings)</li>
+                <li>آپ کیسے ہیں؟</li>
+                <li>السلام علیکم</li>
+                <li>میں کیا کر سکتا ہوں؟</li>
             </ul>
             </div>
             """, unsafe_allow_html=True)
 
-        for i, (user_msg, bot_msg) in enumerate(st.session_state.conversation_history):
-            # User message
+        for user_msg, bot_msg in st.session_state.conversation_history:
             st.markdown(
-                f'<div class="user-message">👤 آپ: {user_msg}</div>',
+                f'<div class="user-message">You: {user_msg}</div>',
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                f'<div class="bot-message">Bot: {bot_msg}</div>',
                 unsafe_allow_html=True
             )
 
-            # Bot message
-            st.markdown(
-                f'<div class="bot-message">🤖 بوٹ: {bot_msg}</div>',
-                unsafe_allow_html=True
-            )
-
-    # Input area
     st.markdown("---")
 
     col1, col2 = st.columns([4, 1])
 
     with col1:
         user_input = st.text_input(
-            "Your message (اپنا پیغام یہاں لکھیں):",
+            "Your message:",
             key="user_input",
-            placeholder="اردو میں لکھیں... (Type in Urdu)",
+            placeholder="Type in Urdu...",
             label_visibility="collapsed"
         )
 
     with col2:
-        send_button = st.button("Send ➤", use_container_width=True, type="primary")
+        send_button = st.button("Send", use_container_width=True, type="primary")
 
-    # Process input
     if send_button and user_input.strip():
-        with st.spinner('جواب تیار کیا جا رہا ہے... Generating response...'):
-            # Simulate processing time
-            time.sleep(0.5)
-
-            # Generate response
+        with st.spinner('Generating response...'):
             response = generate_response(
                 user_input=user_input,
                 model=model,
                 tokenizer=tokenizer,
+                device=device,
                 strategy=decoding_strategy,
                 beam_width=beam_width
             )
 
-            # Add to conversation history
             st.session_state.conversation_history.append((user_input, response))
             st.session_state.message_count += 1
 
-            # Rerun to update display
             st.rerun()
 
-    # Footer
     st.markdown("---")
     st.markdown("""
     <div style='text-align: center; color: gray; padding: 20px;'>
-        <p>Built with ❤️ using PyTorch and Streamlit</p>
-        <p style='direction: rtl; font-family: "Noto Nastaliq Urdu", serif;'>
-            پائی ٹارچ اور سٹریم لِٹ سے بنایا گیا
-        </p>
-        <p><a href='https://github.com/YOUR_USERNAME/urdu-chatbot' target='_blank'>View on GitHub</a> |
-        <a href='https://github.com/YOUR_USERNAME/urdu-chatbot/blob/main/README.md' target='_blank'>Documentation</a></p>
+        <p>Built with PyTorch and Streamlit</p>
     </div>
     """, unsafe_allow_html=True)
 
