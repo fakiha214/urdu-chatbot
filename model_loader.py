@@ -389,7 +389,7 @@ def load_transformer_model(model_path, device='cpu'):
     if not model_path.exists():
         raise FileNotFoundError(f"Model checkpoint not found at {model_path}")
 
-    checkpoint = torch.load(model_path, map_location=device)
+    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
 
     print(f"Loading model from epoch {checkpoint.get('epoch', 'unknown')}")
 
@@ -437,7 +437,7 @@ def load_transformer_model(model_path, device='cpu'):
 
 def get_model_info(model_path):
     """Get information about a saved model without loading it fully"""
-    checkpoint = torch.load(model_path, map_location='cpu')
+    checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
 
     info = {
         'epoch': checkpoint.get('epoch', 'unknown'),
