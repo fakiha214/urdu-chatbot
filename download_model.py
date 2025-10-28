@@ -1,10 +1,9 @@
 """
 Download model from Google Drive if not already present
+Uses gdown library for reliable Google Drive downloads
 """
 
-import os
 from pathlib import Path
-import urllib.request
 import sys
 
 
@@ -17,33 +16,32 @@ def get_google_drive_file_id(url):
     return None
 
 
-def download_google_drive_file(file_id, output_path, chunk_size=8192):
-    """Download file from Google Drive using file ID"""
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+def download_google_drive_file(file_id, output_path):
+    """Download file from Google Drive using gdown library"""
+    try:
+        import gdown
+    except ImportError:
+        print("[ERROR] gdown library not installed")
+        print("Install with: pip install gdown")
+        return False
+
+    url = f"https://drive.google.com/uc?id={file_id}"
+    output_path = str(output_path)
 
     print(f"Downloading model from Google Drive...")
     print(f"Output: {output_path}")
 
     try:
-        with urllib.request.urlopen(url) as response:
-            total_size = int(response.headers.get('content-length', 0))
+        gdown.download(url, output_path, quiet=False)
 
-            with open(output_path, 'wb') as out_file:
-                downloaded = 0
-                while True:
-                    chunk = response.read(chunk_size)
-                    if not chunk:
-                        break
-                    out_file.write(chunk)
-                    downloaded += len(chunk)
+        # Verify file was downloaded
+        if Path(output_path).exists() and Path(output_path).stat().st_size > 1000000:
+            print("\n[SUCCESS] Model downloaded successfully!")
+            return True
+        else:
+            print("\n[ERROR] Downloaded file is too small or missing")
+            return False
 
-                    if total_size > 0:
-                        percent = (downloaded / total_size) * 100
-                        print(f"\rProgress: {percent:.1f}% ({downloaded}/{total_size} bytes)",
-                              end='', file=sys.stderr)
-
-                print("\n[SUCCESS] Model downloaded successfully!", file=sys.stderr)
-                return True
     except Exception as e:
         print(f"\n[ERROR] Failed to download: {e}", file=sys.stderr)
         return False
